@@ -6,8 +6,6 @@ import sys
 import numpy as np
 import pandas as pd
 
-
-# Accept csv/tsv/txt; prefer csv if multiple exist
 ALLOWED_EXT = (".csv", ".tsv", ".txt")
 
 def read_table(path: Path) -> pd.DataFrame:
@@ -25,13 +23,11 @@ def write_csv(df: pd.DataFrame, path: Path) -> None:
 
 def find_angle_match(angle_dir: Path, base_stem: str) -> Path | None:
     """Find angle file in angle_dir whose stem equals base_stem (without _sensor)."""
-    # exact stem match, any allowed ext
     candidates = [p for p in angle_dir.iterdir()
                   if p.is_file()
                   and p.suffix.lower() in ALLOWED_EXT
                   and p.stem == base_stem]
     if not candidates:
-        # also allow case differences in extension/stem just in case
         low = base_stem.lower()
         candidates = [p for p in angle_dir.iterdir()
                       if p.is_file()
@@ -39,7 +35,6 @@ def find_angle_match(angle_dir: Path, base_stem: str) -> Path | None:
                       and p.stem.lower() == low]
     if not candidates:
         return None
-    # prefer csv if multiple
     csvs = [p for p in candidates if p.suffix.lower() == ".csv"]
     return (csvs[0] if csvs else candidates[0])
 
@@ -48,7 +43,6 @@ def nearest_indices(source_times: np.ndarray, target_times: np.ndarray) -> np.nd
     For each t in target_times, return index i such that source_times[i] is closest to t.
     Assumes source_times is sorted ascending and finite.
     """
-    # searchsorted gives insertion positions
     pos = np.searchsorted(source_times, target_times)
     pos_right = np.clip(pos, 0, len(source_times) - 1)
     pos_left = np.clip(pos - 1, 0, len(source_times) - 1)
@@ -70,7 +64,6 @@ def align_one_pair(angle_path: Path, sensor_path: Path, keep_angle_time=False) -
     if "time_ms" not in sen.columns:
         raise ValueError(f"{sensor_path.name} missing 'time_ms'")
 
-    # Sort both by time_ms (in case)
     ang = ang.sort_values("time_ms").reset_index(drop=True)
     sen = sen.sort_values("time_ms").reset_index(drop=True)
 
@@ -82,27 +75,21 @@ def align_one_pair(angle_path: Path, sensor_path: Path, keep_angle_time=False) -
     if np.isnan(sen_time).all():
         raise ValueError(f"All 'time_ms' are NaN in {sensor_path.name}")
 
-    # Drop rows with NaN times (keep corresponding data rows)
     ang_valid = ~np.isnan(ang_time)
     ang = ang.loc[ang_valid].reset_index(drop=True)
     ang_time = ang_time[ang_valid]
 
     sen_valid = ~np.isnan(sen_time)
-    # We will produce output only for valid sensor times; if any NaNs appear, drop them
     sen = sen.loc[sen_valid].reset_index(drop=True)
     sen_time = sen_time[sen_valid]
 
-    # Compute nearest row indices in angle for each sensor timestamp
     idx = nearest_indices(ang_time, sen_time)
 
-    # Build aligned dataframe: pick angle rows at those indices
-    # Keep only non-time columns from angle file, but set time_ms to sensor time
     angle_cols = [c for c in ang.columns if c != "time_ms"]
     aligned = ang.loc[idx, angle_cols].reset_index(drop=True)
-    aligned.insert(0, "time_ms", sen_time)  # match sensor timeline exactly
+    aligned.insert(0, "time_ms", sen_time)
 
     if keep_angle_time:
-        # optional diagnostic column showing the original angle timestamp chosen
         aligned.insert(1, "angle_time_ms_chosen", ang_time[idx])
 
     return aligned
@@ -128,8 +115,6 @@ def main():
     if not sensor_dir.is_dir():
         sys.exit(f"Sensor dir not found: {sensor_dir}")
 
-    # Iterate all sensor files that end with _sensor before extension
-    # e.g., 'Emma_sensor.csv', 'Adrian_session_sensor.tsv'
     sensor_files = [p for p in sensor_dir.iterdir()
                     if p.is_file()
                     and p.suffix.lower() in ALLOWED_EXT
@@ -143,10 +128,6 @@ def main():
     skipped = 0
 
     for s_path in sorted(sensor_files):
-        # Remove a single trailing '_sensor' from the stem to get the base
-        # Examples:
-        #   Emma_sensor.csv -> base=Emma
-        #   Adrian_session_sensor.tsv -> base=Adrian_session
         base_stem = re.sub(r"(?:^|_)(sensor)$", "", s_path.stem, count=1, flags=re.IGNORECASE)
         if base_stem.endswith("_"):
             base_stem = base_stem[:-1]
