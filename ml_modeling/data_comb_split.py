@@ -77,7 +77,7 @@ def main():
     parser.add_argument("--train_dir", required=True)
     parser.add_argument("--test_dir", required=True)
     parser.add_argument("--train_ratio", type=float, default=0.7)
-    # NEW: only drop to numeric if you ask for it
+
     parser.add_argument("--numeric_only", action="store_true",
                         help="If set, keep numeric columns only (plus any shared time key).")
     args = parser.parse_args()
@@ -109,7 +109,6 @@ def main():
             key = find_common_time_key(sensor_aligned, mocap_aligned)
             sensor_aligned = select_numeric_only(sensor_aligned, [key] if key else None)
             mocap_aligned  = select_numeric_only(mocap_aligned,  [key] if key else None)
-        # else: KEEP ALL COLUMNS
 
         s_train, m_train, s_test, m_test = chronological_split(
             sensor_aligned, mocap_aligned, train_ratio=args.train_ratio
